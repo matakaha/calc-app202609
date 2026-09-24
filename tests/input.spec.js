@@ -25,6 +25,10 @@ test('toggles the sign and clears the display', async ({ page }) => {
 });
 
 test('supports keyboard input', async ({ page }) => {
+  // アプリの描画・イベントリスナー登録が完了する前にキー入力が送られると
+  // 最初のキーが失われることがあるため、表示が確実に初期状態になるまで待つ。
+  await expect(display(page)).toHaveText('0');
+
   await page.keyboard.press('5');
   await page.keyboard.press('+');
   await page.keyboard.press('4');
