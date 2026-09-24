@@ -96,6 +96,7 @@ jobs:
     name: Production deployment
     if: github.event_name == 'push'
     needs: e2e
+    environment: Production
     concurrency:
       group: production-deployment
       cancel-in-progress: true

@@ -78,10 +78,12 @@ The workflow requires these GitHub repository secrets:
 - `AZURE_SUBSCRIPTION_ID`
 
 The corresponding Microsoft Entra identity must have a federated credential
-matching this repository and the `main` branch. The workflow grants the OIDC
-permission only to its production deployment job. At the narrowest practical
-Azure scope, the identity must also be allowed to read the deployment token for
-`rg-calc202609`/`calcweb202609`, including the
+matching this repository's `Production` environment. With this repository's
+immutable-identity OIDC subject format, the presented subject is
+`repo:matakaha@50935913/calc-app202609@1384369456:environment:Production`.
+The workflow grants the OIDC permission only to its production deployment job.
+At the narrowest practical Azure scope, the identity must also be allowed to
+read the deployment token for `rg-calc202609`/`calcweb202609`, including the
 `Microsoft.Web/staticSites/listSecrets/action` permission. GitHub Dependency
 Graph and code scanning must be enabled for the repository; private repository
 availability depends on the enabled GitHub security products.
