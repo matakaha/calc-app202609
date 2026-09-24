@@ -21,6 +21,18 @@ npm run build
 The production files are generated in `src/dist`. The later Static Web Apps GitHub
 Actions workflow can use `src` as the app location and `dist` as the output location.
 
+## End-to-end tests
+
+Install the application and Playwright dependencies, then run the Edge-only test suite:
+
+```powershell
+Set-Location .\src
+npm install
+Set-Location ..
+npm install
+npm run test:e2e
+```
+
 ## Azure infrastructure
 
 [`Infra/main.bicep`](Infra/main.bicep) creates one Azure Static Web App on the
