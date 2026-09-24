@@ -10,14 +10,14 @@ test('accepts decimal input and removes the final digit', async ({ page }) => {
   await page.getByRole('button', { name: '1', exact: true }).click();
   await page.getByRole('button', { name: '.', exact: true }).click();
   await page.getByRole('button', { name: '2', exact: true }).click();
-  await page.getByRole('button', { name: 'DEL', exact: true }).click();
+  await page.getByRole('button', { name: '最後の1桁を削除', exact: true }).click();
 
   await expect(display(page)).toHaveText('1.');
 });
 
 test('toggles the sign and clears the display', async ({ page }) => {
   await page.getByRole('button', { name: '2', exact: true }).click();
-  await page.getByRole('button', { name: '+/−', exact: true }).click();
+  await page.getByRole('button', { name: '符号を反転', exact: true }).click();
   await expect(display(page)).toHaveText('-2');
 
   await page.getByRole('button', { name: 'AC', exact: true }).click();

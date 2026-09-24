@@ -1,0 +1,157 @@
+name: Validate and deploy Azure Static Web App
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+permissions: {}
+
+env:
+  NODE_VERSION: "22"
+  AZURE_RESOURCE_GROUP: rg-calc202609
+  AZURE_STATIC_WEB_APP_NAME: calcweb202609
+
+jobs:
+  code-scanning:
+    name: Code scanning
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: javascript-typescript
+
+      - name: Run CodeQL analysis
+        uses: github/codeql-action/analyze@v4
+
+  dependency-review:
+    name: Dependency review
+    needs: code-scanning
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Review dependency changes
+        if: github.event_name == 'pull_request'
+        uses: actions/dependency-review-action@v5
+        with:
+          fail-on-severity: low
+
+      - name: Review dependency changes
+        if: github.event_name == 'push'
+        uses: actions/dependency-review-action@v5
+        with:
+          base-ref: ${{ github.event.before }}
+          head-ref: ${{ github.sha }}
+          fail-on-severity: low
+
+  e2e:
+    name: E2E tests
+    needs: dependency-review
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            src/package-lock.json
+
+      - name: Install E2E dependencies
+        run: npm ci
+
+      - name: Install application dependencies
+        run: npm ci --prefix src
+
+      - name: Install Microsoft Edge for Playwright
+        run: npx playwright install --with-deps msedge
+
+      - name: Run E2E tests
+        run: npm run test:e2e
+
+  deploy:
+    name: Production deployment
+    if: github.event_name == 'push'
+    needs: e2e
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: src/package-lock.json
+
+      - name: Install application dependencies
+        run: npm ci --prefix src
+
+      - name: Build application
+        run: npm run build --prefix src
+
+      - name: Log in to Azure with OIDC
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Get Static Web Apps deployment token
+        id: swa-token
+        shell: bash
+        run: |
+          set -euo pipefail
+          deployment_token="$(
+            az staticwebapp secrets list \
+              --name "$AZURE_STATIC_WEB_APP_NAME" \
+              --resource-group "$AZURE_RESOURCE_GROUP" \
+              --query properties.apiKey \
+              --output tsv
+          )"
+
+          if [[ -z "$deployment_token" ]]; then
+            echo "::error::Azure CLI returned an empty Static Web Apps deployment token."
+            exit 1
+          fi
+
+          echo "::add-mask::$deployment_token"
+          echo "deployment_token=$deployment_token" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy to Azure Static Web Apps
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          action: upload
+          azure_static_web_apps_api_token: ${{ steps.swa-token.outputs.deployment_token }}
+          app_location: src/dist
+          api_location: ""
+          output_location: ""
+          skip_app_build: true
